@@ -1,0 +1,17 @@
+# Ignore Python cache
+__pycache__/
+*.pyc
+
+# Ignore virtual environment
+.venv/
+
+# Ignore logs
+*.log
+
+# Ignore IDE files
+.vscode/
+
+examples
+instructions.txt
+
+api_keys.py
