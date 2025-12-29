@@ -1,17 +1,43 @@
-# Ignore Python cache
+# ------------------------
+# Python cache
+# ------------------------
 __pycache__/
 *.pyc
 
-# Ignore virtual environment
+# ------------------------
+# Virtual environment
+# ------------------------
 .venv/
 
-# Ignore logs
+# ------------------------
+# Logs
+# ------------------------
 *.log
 
-# Ignore IDE files
+# ------------------------
+# Jupyter
+# ------------------------
+*.ipynb
+
+# ------------------------
+# IDE files
+# ------------------------
 .vscode/
 
-examples
-instructions.txt
+# ------------------------
+# Ignore everything in 'examples' folder
+# ------------------------
+examples/
 
+# Keep instructions.txt inside examples
+!examples/instructions.txt
+
+# ------------------------
+# Sensitive files
+# ------------------------
 api_keys.py
+
+# ------------------------
+# Ignore everything in 'data' folder
+# ------------------------
+data/

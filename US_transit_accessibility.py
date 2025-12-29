@@ -1,7 +1,3 @@
-# import sys, os
-# sys.path.append("/home/miguel/Documents/Proyectos/PTLevelofService/gtfs/pyGTFSHandler")
-# sys.path.append('/home/miguel/Documents/Proyectos/PTLevelofService/accessibility/UrbanAccessAnalyzer')
-
 import os
 import subprocess
 import sys
@@ -17,10 +13,10 @@ import geopandas as gpd
 import pandas as pd
 
 refresh_token = api_keys.MOBILITY_DATABASE
-orig_gtfs_path = "orig_gtfs_files"
-gtfs_path = "gtfs_files"
-osm_path = "osm"
-output_path = "accessibility"
+orig_gtfs_path = "data/orig_gtfs_files"
+gtfs_path = "data/gtfs_files"
+osm_path = "data/osm"
+output_path = "data/accessibility"
 
 start_time = time(hour=6)
 end_time = time(hour=22)
@@ -64,7 +60,7 @@ os.makedirs(gtfs_path, exist_ok=True)
 
 api = MobilityDatabaseClient(refresh_token)
 
-aois = gpd.read_file("cb_2018_us_state_500k/cb_2018_us_state_500k.shp")
+aois = gpd.read_file("data/cb_2018_us_state_500k/cb_2018_us_state_500k.shp")
 aois["filename"] = aois["NAME"].map(gtfs_checker.normalize_string)
 aois = aois.dropna(subset=["filename"])
 
