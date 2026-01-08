@@ -16,6 +16,7 @@ from typing import (
 
 import numpy as np
 import pandas as pd
+import geopandas as gpd
 import polars as pl
 
 import warnings
@@ -23,6 +24,10 @@ import warnings
 # Type variables
 T = TypeVar("T")  # Generic input type (interval, route_type, etc.)
 Q = TypeVar("Q", bound=float)  # Quality value type
+
+
+def elasticity_from_linear_decay(decay, point):
+    return -abs(decay) * point / (1 - abs(decay) * point)
 
 
 def parse_column_with_pattern(column_name: str, column_pattern: str) -> Dict[str, Any]:
@@ -123,7 +128,7 @@ def elasticity_based_quality(
         def elasticity_fn(x: float) -> float:
             return elasticity
 
-    elif isinstance(elasticity, list):
+    elif isinstance(elasticity, (list, tuple)):
         # Piecewise elasticity
         processed = [(-math.inf if lb is None else lb, e) for lb, e in elasticity]
         processed.sort(key=lambda t: t[0])
@@ -152,7 +157,7 @@ def elasticity_based_quality(
     xs = np.linspace(reference, value, steps)
     integrand = [elasticity_fn(x) / x for x in xs]
     integral = np.trapezoid(integrand, xs)
-    return math.exp(-integral)
+    return math.exp(integral)
 
 
 def calibrate_quality_func(
@@ -208,16 +213,35 @@ def calibrate_quality_func(
         raise ValueError("No points provided to compute quality range")
 
     qualities = [quality_func(*p) for p in combinations]
+    if min_quality > 0:
+        if min_point:
+            if quality_func(*min_point) == 0:
+                raise Exception(
+                    f"Quality for min_point {min_point} is 0 but min_quality is {min_quality}"
+                )
+
+        else:
+            qualities = [q for q in qualities if q != 0]
+            if len(qualities) == 0:
+                raise Exception("All qualities returned by quality_func are 0.")
 
     q_min = quality_func(*min_point) if min_point is not None else min(qualities)
     q_max = quality_func(*max_point) if max_point is not None else max(qualities)
+
+    if q_max == 0:
+        raise Exception("Maximum quality is 0")
 
     if q_min == q_max:
         raise ValueError("q_min and q_max are equal; cannot normalize")
 
     def access_quality(*args: T) -> float:
         x = quality_func(*args)
-        return min_quality + (x - q_min) * (max_quality - min_quality) / (q_max - q_min)
+        if x == 0:
+            return 0
+        else:
+            return min_quality + (x - q_min) * (max_quality - min_quality) / (
+                q_max - q_min
+            )
 
     return access_quality
 
@@ -289,7 +313,7 @@ def generate_access_df(
     df["access"] = df.apply(
         lambda row: access_quality_func(*[row[c] for c in columns]), axis=1
     )
-
+    df.loc[df["access"].isna() | df["access"].isnull(), "access"] = 0
     # Rounding if provided
     if access_qualities is not None:
         access_arr = np.array(access_qualities)
@@ -328,11 +352,11 @@ def generate_access_df(
 
 
 def assign_access_value(
-    lf: Union[pl.LazyFrame, pl.DataFrame],
+    lf: Union[pl.LazyFrame, pl.DataFrame, pd.DataFrame, gpd.GeoDataFrame],
     access_quality_func: Callable[..., float],
     column_pattern,
     distance_steps: Optional[Sequence[float]] = None,
-) -> pl.LazyFrame:
+) -> Union[pl.LazyFrame, pl.DataFrame, pd.DataFrame, gpd.GeoDataFrame]:
     """
     Assign access values to Polars columns based on column_pattern.
 
@@ -352,8 +376,30 @@ def assign_access_value(
     pl.LazyFrame
         LazyFrame with transformed access columns and a combined 'access' column.
     """
+
+    do_collect = False
+    do_pandas = False
+    do_geopandas = False
+    geometry_column = None
+    crs = None
+
     # Ensure LazyFrame
+    if isinstance(lf, gpd.GeoDataFrame):
+        do_geopandas = True
+        geometry_column = lf.geometry.name
+        crs = lf.crs
+        # Suppress only UserWarnings temporarily
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", UserWarning)
+            # Convert geometry to WKT strings
+            lf[geometry_column] = lf.geometry.to_wkt().astype(str)
+
+    if isinstance(lf, pd.DataFrame):
+        do_pandas = True
+        lf = pl.from_pandas(lf)
+
     if isinstance(lf, pl.DataFrame):
+        do_collect = True
         lf = lf.lazy()
 
     # Select columns
@@ -372,7 +418,6 @@ def assign_access_value(
     lf = lf.with_columns([pl.col(col).cast(float).alias(col) for col in columns])
 
     transform_columns = []
-
     for column in columns:
         # Distance steps
         if distance_steps is None:
@@ -383,11 +428,14 @@ def assign_access_value(
         else:
             col_distance_steps = sorted(np.unique(distance_steps))
 
+        if len(col_distance_steps) == 0:
+            transform_columns.append(pl.lit(0).alias(column))
+            continue
+
         # Extract parameters from column name
         params_dict = parse_column_with_pattern(column, column_pattern)
 
         variable_steps = [[v] for v in params_dict.values()] + [col_distance_steps]
-
         # Generate access mapping DataFrame
         access_df = generate_access_df(
             access_quality_func,
@@ -399,21 +447,26 @@ def assign_access_value(
         # The last argument corresponds to distance
         rename_map[f"arg{len(params_keys)}"] = "distance"
         access_df = access_df.rename(columns=rename_map)
+        access_df = access_df.dropna(subset=["access_rounded", "distance"])
         access_df = access_df.sort_values(
-            ["access_rounded", "distance"], ascending=False
+            ["access_rounded", "distance"], ascending=[False, False], na_position="last"
         )
         access_df = access_df.drop_duplicates(
             ["access_rounded"], keep="first"
         ).reset_index(drop=True)
-
         # Build Polars expressions
         mapping = dict(zip(access_df["distance"], access_df["access_rounded"]))
         expr = None
         for d, a in mapping.items():
-            if expr is None:
-                expr = pl.when(pl.col(column) <= d).then(a)
+            if not isinstance(d, (float, int)) or (
+                isinstance(d, float) and math.isnan(d)
+            ):
+                continue
             else:
-                expr.when(pl.col(column) <= d).then(a)
+                if expr is None:
+                    expr = pl.when(pl.col(column) <= d).then(a)
+                else:
+                    expr = expr.when(pl.col(column) <= d).then(a)
 
         expr = expr.otherwise(0)
 
@@ -421,8 +474,18 @@ def assign_access_value(
 
     # Apply transformations
     lf = lf.with_columns(transform_columns)
-
     # Compute max access across transformed columns
     lf = lf.with_columns(pl.max_horizontal(columns).alias("access")).drop(columns)
+
+    if do_collect:
+        lf = lf.collect()
+
+    if do_pandas:
+        lf = lf.to_pandas()
+
+    if do_geopandas:
+        lf = gpd.GeoDataFrame(
+            lf, geometry=gpd.GeoSeries.from_wkt(lf[geometry_column]), crs=crs
+        )
 
     return lf

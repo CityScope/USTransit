@@ -19,6 +19,14 @@ CENSUS_LATEST_YEARS: Dict[str, int] = {
     "acs/acs1": 2024,  # Only places and higher
 }
 
+# Fetch census data
+GEO_HIERARCHIES = {
+    "block": ["state", "county", "tract", "block"],
+    "blockgroup": ["state", "county", "tract", "block group"],
+    "tract": ["state", "county", "tract"],
+    "place": ["state", "place"],
+}
+
 census_api_key: str = api_keys.US_CENSUS
 
 
@@ -114,10 +122,14 @@ def format_categories_dict(
             )
             return source
 
-    def format_years(source: str, years: Optional[Union[int, List[int]]]) -> List[int]:
+    def format_years(
+        source: str,
+        years: Optional[Union[int, List[int]]],
+        census_latest_years=CENSUS_LATEST_YEARS,
+    ) -> List[int]:
         """Ensure years are a list and defaults to latest available."""
         if years is None:
-            return _to_list(CENSUS_LATEST_YEARS[source])
+            return _to_list(census_latest_years[source])
         return _to_list(years)
 
     # Standardize source and years
@@ -380,6 +392,7 @@ def load_fields(
     level: str = "blockgroup",
     compute_ratios: bool = True,
     add_place_names: bool = False,
+    geo_hierarchies=GEO_HIERARCHIES,
 ) -> pd.DataFrame:
     """
     Pull tabular census data from Decennial Census or ACS and compute ratios.
@@ -460,19 +473,12 @@ def load_fields(
         if add_place_names and level.startswith("place"):
             codes_by_source_year[key].add("NAME")
 
-    # Fetch census data
-    GEO_HIERARCHIES = {
-        "block": ["state", "county", "tract", "block"],
-        "blockgroup": ["state", "county", "tract", "block group"],
-        "tract": ["state", "county", "tract"],
-        "place": ["state", "place"],
-    }
-    for k, v in list(GEO_HIERARCHIES.items()):
-        GEO_HIERARCHIES[k + "s"] = v  # allow plural
+    for k, v in list(geo_hierarchies.items()):
+        geo_hierarchies[k + "s"] = v  # allow plural
 
     df_by_source_year: Dict[tuple, pd.DataFrame] = {}
     for (source, year), all_fields in codes_by_source_year.items():
-        geo_hierarchy = GEO_HIERARCHIES[level]
+        geo_hierarchy = geo_hierarchies[level]
         geo_for = geo_hierarchy[-1] + ":*"
         geo_in = [
             f"state:{state_id}" if g == "state" else f"{g}:*"

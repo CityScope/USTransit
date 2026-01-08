@@ -16,8 +16,8 @@ dependencies = [
 ]
 
 [tool.uv.sources]
-urbanaccessanalyzer = { git = "https://github.com/CityScope/UrbanAccessAnalyzer.git" }
 pygtfshandler = { git = "https://github.com/CityScope/pyGTFSHandler.git" }
+urbanaccessanalyzer = { git = "https://github.com/CityScope/UrbanAccessAnalyzer.git" }
 
 [dependency-groups]
 dev = [

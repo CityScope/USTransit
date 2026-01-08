@@ -2072,7 +2072,7 @@ wheels = [
 [[package]]
 name = "urbanaccessanalyzer"
 version = "0.1.0"
-source = { git = "https://github.com/CityScope/UrbanAccessAnalyzer.git#175a8e62a67aefb6bbfef034a645204859aae48c" }
+source = { git = "https://github.com/CityScope/UrbanAccessAnalyzer.git#621c7d38a3d2df8f877646205c7accea25b755d7" }
 dependencies = [
     { name = "geopandas" },
     { name = "geopy" },
