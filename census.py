@@ -25,10 +25,207 @@ GEO_HIERARCHIES = {
     "blockgroup": ["state", "county", "tract", "block group"],
     "tract": ["state", "county", "tract"],
     "place": ["state", "place"],
+    "state": ["state"],
 }
 
 census_api_key: str = api_keys.US_CENSUS
 
+
+CENSUS_FIELDS_CATEGORIES = {
+    # ============================================================
+    # TOTAL POPULATION
+    # ============================================================
+    "population": {
+        "source": "decennial_dhc",  # Decennial Census (full population count)
+        "years": 2020,
+        "fields": {
+            # Total population
+            # Returns: number of people (integer)
+            "2020": ["P1_001N"],
+        },
+        "fields_universe": {
+            # Raw count only
+            "default": "DENSITY_ONLY",
+        },
+    },
+    # ============================================================
+    # RACE / ETHNICITY
+    # ============================================================
+    "race": {
+        "source": "decennial_dhc",
+        "years": 2020,
+        "fields": {
+            # White alone
+            # Returns: number of people
+            "white": ["P3_002N"],
+            # Non-white population (all other race categories)
+            # Returns: number of people
+            "nonWhite": [
+                "P3_003N",
+                "P3_004N",
+                "P3_005N",
+                "P3_006N",
+                "P3_007N",
+                "P3_008N",
+            ],
+            # Black or African American alone
+            # Returns: number of people
+            "black": ["P3_003N"],
+            # American Indian and Alaska Native alone
+            # Returns: number of people
+            "native": ["P3_004N"],
+            # Asian alone
+            # Returns: number of people
+            "asian": ["P3_005N"],
+            # Other races (NHPI, Other race, Two or more races)
+            # Returns: number of people
+            "others": ["P3_006N", "P3_007N", "P3_008N"],
+            # Hispanic or Latino (any race)
+            # Returns: number of people
+            "hispanic": ["P5_010N"],
+            # Hispanic OR non-white population
+            # Returns: number of people
+            "hispanicOrNonWhite": [
+                "P5_004N",
+                "P5_005N",
+                "P5_006N",
+                "P5_007N",
+                "P5_008N",
+                "P5_009N",
+                "P5_010N",
+            ],
+        },
+        "fields_universe": {
+            # Total population
+            # Used to compute race percentages
+            "default": "P3_001N",
+        },
+    },
+    # ============================================================
+    # INCOME / POVERTY
+    # ============================================================
+    "income": {
+        "source": "acs5",  # ACS 5-year estimates (sample-based)
+        "years": 2023,
+        "fields": {
+            # Median household income (inflation-adjusted dollars)
+            # Returns: dollar amount
+            "median": ["B19013_001"],
+            # Below 50% of federal poverty level
+            # Returns: number of people
+            "050PercentPoverty": ["C17002_002"],
+            # Below 100% of poverty level
+            # Returns: number of people
+            "100PercentPoverty": ["C17002_002", "C17002_003"],
+            # Below 150% of poverty level
+            # Returns: number of people
+            "150PercentPoverty": [
+                "C17002_002",
+                "C17002_003",
+                "C17002_004",
+                "C17002_005",
+            ],
+            # Below 200% of poverty level
+            # Returns: number of people
+            "200PercentPoverty": [
+                "C17002_002",
+                "C17002_003",
+                "C17002_004",
+                "C17002_005",
+                "C17002_006",
+                "C17002_007",
+            ],
+        },
+        "fields_universe": {
+            # Population for whom poverty status is determined
+            "default": "C17002_001",
+            # Median income is not a population count
+            "median": "NO_DENSITY_OR_RATIO",
+        },
+    },
+    # ============================================================
+    # COMMUTING / TRANSPORTATION
+    # ============================================================
+    "commute": {
+        "source": "acs5",
+        "years": 2023,
+        "fields": {
+            # Total workers age 16+
+            # Returns: number of workers
+            "workersTotal": ["B08301_001"],
+            # Public transportation (all transit modes combined)
+            # Returns: number of workers
+            "transit": ["B08301_010"],
+            # Bus
+            # Returns: number of workers
+            "bus": ["B08301_011"],
+            # Subway and light rail
+            # Returns: number of workers
+            "rapidTransit": ["B08301_012", "B08301_014"],
+            # Commuter rail
+            # Returns: number of workers
+            "commuterRail": ["B08301_013"],
+            # Car (drive alone or carpool)
+            # Returns: number of workers
+            "car": ["B08301_002"],
+            # Walked to work
+            # Returns: number of workers
+            "walk": ["B08301_019"],
+            # Biked to work
+            # Returns: number of workers
+            "bike": ["B08301_018"],
+            # Walked or biked
+            # Returns: number of workers
+            "walkBike": ["B08301_018", "B08301_019"],
+            # Other transportation modes
+            # Returns: number of workers
+            "otherModes": ["B08301_016", "B08301_017", "B08301_020"],
+            # Mean travel time to work (minutes)
+            # Universe: workers 16+ who did not work from home
+            # Returns: numeric average (minutes)
+            "meanCommuteTime": ["B08303_001"],
+            # Mean travel time to work by public transportation (minutes)
+            # Universe: workers 16+ who commute by transit
+            # Returns: numeric average (minutes)
+            "meanTransitCommuteTime": ["B08136_001"],
+        },
+        "fields_universe": {
+            # Workers age 16+
+            # Used for commute mode percentages
+            "default": "B08301_001",
+            # Mean commute time fields are not counts or ratios
+            "meanCommuteTime": "NO_DENSITY_OR_RATIO",
+            "meanTransitCommuteTime": "NO_DENSITY_OR_RATIO",
+        },
+    },
+    # ============================================================
+    # VEHICLE AVAILABILITY
+    # ============================================================
+    "vehicles": {
+        "source": "acs5",
+        "years": 2023,
+        "fields": {
+            # Total occupied housing units
+            # Returns: number of households
+            "householdTotal": ["B25044_001"],
+            # Households with zero vehicles
+            # Returns: number of households
+            "0inHousehold": ["B25044_003", "B25044_010"],
+            # Households with zero or one vehicle
+            # Returns: number of households
+            "0or1inHousehold": ["B25044_003", "B25044_004", "B25044_010", "B25044_011"],
+            # Mean household size
+            # Returns: average number of persons per household
+            "meanHouseholdSize": ["B25010_001"],
+        },
+        "fields_universe": {
+            # Occupied housing units
+            "default": "B25044_001",
+            # Mean household size is already an average
+            "meanHouseholdSize": "NO_DENSITY_OR_RATIO",
+        },
+    },
+}
 
 # ----------------------------
 # Utilities
@@ -86,7 +283,7 @@ def format_filter(
 
 
 def format_categories_dict(
-    categories: Dict[str, Dict], inplace: bool = False
+    categories: Dict[str, Dict] = CENSUS_FIELDS_CATEGORIES, inplace: bool = False
 ) -> Dict[str, Dict]:
     """
     Format a categories dictionary for census data requests.
@@ -386,7 +583,7 @@ def load_shapes(
 
 
 def load_fields(
-    categories: Dict[str, Dict],
+    categories: Dict[str, Dict] = CENSUS_FIELDS_CATEGORIES,
     api_key: str = census_api_key,
     state: Union[str, us.states.State] = "MA",
     level: str = "blockgroup",

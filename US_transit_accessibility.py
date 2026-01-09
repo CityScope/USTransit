@@ -24,7 +24,8 @@ date_type = "businessday"
 
 min_edge_length = 30
 distance_steps = [100, 200, 400, 600, 800, 1000, 1250, 1500, 2000]
-interval_steps = [5, 10, 15, 20, 30, 45, 60, 90, 120, 180, 360, 720, 1440]
+# interval_steps = [5, 10, 15, 20, 30, 45, 60, 90, 120, 180, 360, 720, 1440]
+interval_steps = [5, 7, 10, 15, 20, 30, 45, 60, 90, 120, 180, 360, 720, 1440]
 
 start_date = date(day=1, month=12, year=2025)
 end_date = date(day=28, month=2, year=2026)
